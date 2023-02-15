@@ -1,4 +1,4 @@
-function [variable_table] = MED(name, flag, r, v, t, min_D, min_T, min_V)
+function [variable_table] = MED(name, r, v, t, min_D, min_T, min_V, min_N, min_r2alpha)
 % -------------------------------------------------------------------------
 % The MED.m function is responsible for calculating the MED variables to an
 % n-dimensional file and exporting as output
@@ -15,7 +15,7 @@ function [variable_table] = MED(name, flag, r, v, t, min_D, min_T, min_V)
 %
 % Output:
 %     variable_table = table with MED variables for output
-%--------------------------------------------------------------------------
+% -------------------------------------------------------------------------
 
 variable_table = table;
 
@@ -25,37 +25,50 @@ n = zeros(dim, 1); nt = n; w = n; r2 = n; peak = n;
 
 for i = 1 : dim
     ME_i = segment_MED(t, r(:, i), v(:, i), min_D, min_T, min_V);          % Finds the frames that occur valid motion elements in the i-dimension
-    
+
     if isempty(ME_i)
         continue
     end
-    
-    [n(i), nt(i), ~, ~, ~, waux, r2aux, ...                                % Check the MED variables for this i-dimension
+
+    [n(i), nt(i), D{i}, V{i}, ~, waux, r2aux, ...                    % Check the MED variables for this i-dimension
         peakaux] = analyze_elements_MED(r(:, i), v(:, i), t, ME_i);
     w(i) = mean(waux);
     r2(i) = mean(r2aux);
     peak(i) = mean(peakaux);
 end
 
-if sum(n) > 0
-    nt_mean = sum(nt.*n) / sum(n);                                         % Calculating mean of the MED variables of each dimension
-    w_mean = sum(w.*n) / sum(n);
-    r2_mean = sum(r2.*n) / sum(n);
-    peak_mean = sum(peak.*n) / sum(n);
-else
-    nt_mean = nan;
-    w_mean = nan;
-    r2_mean = nan;
-    peak_mean = nan;
+if isempty(min_N)
+    min_N = 1;
 end
 
-variable_table.ind = name;                                           % Filling in the variables table
-if(~isempty(flag))
-    variable_table.flag = flag;
+if isempty(min_r2alpha)
+    min_r2alpha = -1;
 end
-variable_table.w_inertial = w_mean;
-variable_table.r2_inertial = r2_mean;
-variable_table.peak_inertial = peak_mean;
-variable_table.nt_inertial = nt_mean;
+
+if sum(n) >= min_N
+   
+    D = cell2mat(D);
+    V = cell2mat(V);
+    r2alpha = (corr(log10(D)', log10(V)'))^2;
+
+    if r2alpha >= min_r2alpha
+        nt_mean = sum(nt.*n) / sum(n);                                         % Calculating mean of the MED variables of each dimension
+        w_mean = sum(w.*n) / sum(n);
+        r2_mean = sum(r2.*n) / sum(n);
+        peak_mean = sum(peak.*n) / sum(n);
+    else
+        return;
+    end
+
+else
+    return;
+end
+
+variable_table.ind = name;                                                 % Filling in the variables table
+variable_table.w = w_mean;
+variable_table.r2 = r2_mean;
+variable_table.peak = peak_mean;
+variable_table.nt = nt_mean;
 variable_table.n = sum(n);
+variable_table.r2_alpha = r2alpha;
 end
